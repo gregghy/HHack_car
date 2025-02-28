@@ -1,3 +1,6 @@
 [submodule "recastnavigation"]
 	path = recastnavigation
 	url = https://github.com/recastnavigation/recastnavigation
+[submodule "VideoPipe"]
+	path = VideoPipe
+	url = https://github.com/sherlockchou86/VideoPipe
