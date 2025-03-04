@@ -66,14 +66,18 @@ def get_person_direction(landmarks, frame_width, frame_height):
 # Initialize OpenCV
 cap = cv2.VideoCapture(0)
 
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 480)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
+frame_rate = 24
+
 # Main loop
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret:
         break
 
-    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    results = pose.process(frame_rgb)
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    results = pose.process(frame)
 
     # Draw landmarks on the frame
     if results.pose_landmarks:
