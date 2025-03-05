@@ -7,7 +7,7 @@ pose = mp_pose.Pose()
 mp_drawing = mp.solutions.drawing_utils  # For drawing landmarks
 
 # Open webcam
-cap = cv2.VideoCapture(2)
+cap = cv2.VideoCapture(0)
 
 def detect_fall(landmarks, height):
     """
