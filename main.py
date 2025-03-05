@@ -3,33 +3,6 @@ import time
 import cv2
 import mediapipe as mp
 
-# Set up GPIO
-GPIO.setmode(GPIO.BCM)
-
-# Motor Driver Pins
-left_motor_forward = 17
-left_motor_backward = 18
-right_motor_forward = 22
-right_motor_backward = 23
-
-# Set GPIO pins as output
-GPIO.setup(left_motor_forward, GPIO.OUT)
-GPIO.setup(left_motor_backward, GPIO.OUT)
-GPIO.setup(right_motor_forward, GPIO.OUT)
-GPIO.setup(right_motor_backward, GPIO.OUT)
-
-# Initialize MediaPipe Pose model
-mp_pose = mp.solutions.pose
-pose = mp_pose.Pose()
-mp_drawing = mp.solutions.drawing_utils  # For drawing landmarks
-
-# Open webcam
-cap = cv2.VideoCapture(0)
-
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 480)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
-frame_rate = 24
-
 def detect_fall(landmarks, height):
     """
     Detects if a person has fallen based on pose landmarks.
@@ -45,13 +18,22 @@ def detect_fall(landmarks, height):
     left_hip_y = landmarks[mp_pose.PoseLandmark.LEFT_HIP].y * height
     right_hip_y = landmarks[mp_pose.PoseLandmark.RIGHT_HIP].y * height
 
+    
     # Average shoulder and hip height
     avg_shoulder_y = (left_shoulder_y + right_shoulder_y) / 2
     avg_hip_y = (left_hip_y + right_hip_y) / 2
 
+    """
     # Fall detection logic: If the head and hips are near the ground (below shoulders)
     if nose_y > avg_shoulder_y and avg_hip_y > avg_shoulder_y:
         return True  # Fall detected
+    """
+    if nose_y > left_shoulder_y and nose_y > left_hip_y:
+        return True
+    if nose_y > right_shoulder_y and nose_y > right_hip_y:
+        return True
+    if avg_hip_y <= avg_shoulder_y+20:
+        return True
 
     return False  # No fall detected
 
@@ -95,6 +77,44 @@ def get_person_direction(landmarks, frame_width, frame_height):
             return "forward"
     return "no_person"
 
+# Set up GPIO
+GPIO.setmode(GPIO.BCM)
+
+# Motor Driver Pins
+left_motor_forward = 17
+left_motor_backward = 18
+right_motor_forward = 22
+right_motor_backward = 23
+
+# Set GPIO pins as output
+GPIO.setup(left_motor_forward, GPIO.OUT)
+GPIO.setup(left_motor_backward, GPIO.OUT)
+GPIO.setup(right_motor_forward, GPIO.OUT)
+GPIO.setup(right_motor_backward, GPIO.OUT)
+
+# Initialize MediaPipe Pose model
+mp_pose = mp.solutions.pose
+pose = mp_pose.Pose()
+mp_drawing = mp.solutions.drawing_utils  # For drawing landmarks
+
+# Open webcam
+cap = cv2.VideoCapture(0)
+
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 480)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
+frame_rate = 24
+
+def move_to_person(fall_detected, text, color):
+    while fall_detected:
+    # Get the direction towards the person
+        person_direction = get_person_direction(results.pose_landmarks.landmark, frame.shape[1], frame.shape[0])
+        text = f"FALL DETECTED -> Direction: {person_direction}"
+
+    # Move the car based on the direction
+        move_car(person_direction)
+    
+        cv2.putText(frame, text, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+        cv2.imshow("Car Camera Feed", frame)
 
 while cap.isOpened():
     ret, frame = cap.read()
@@ -117,56 +137,27 @@ while cap.isOpened():
 
     # Display warning if fall is detected
     if fall_detected:
-        cv2.putText(frame, "FALL DETECTED!", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-        # Show output frame
-        cv2.imshow("Fall Detection", frame)
-        while fall_detected:
-            # Get the direction towards the person
-            person_direction = get_person_direction(results.pose_landmarks.landmark, frame.shape[1], frame.shape[0])
-
-            # Move the car based on the direction
-            move_car(person_direction)
-
-            #    Display the direction on the screen
-            cv2.putText(frame, f"Direction: {person_direction}", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-
-            cv2.imshow("Car Camera Feed", frame)
-
-            if cv2.waitKey(1) & 0xFF == ord("q"):
-                break
-
-    # Exit if 'q' is pressed
-    if cv2.waitKey(1) & 0xFF == ord("q"):
-        break
-
-# Main loop
-"""
-while cap.isOpened():
-    ret, frame = cap.read()
-    if not ret:
-        break
-
-    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    results = pose.process(frame)
-
-    # Draw landmarks on the frame
-    if results.pose_landmarks:
-        mp.solutions.drawing_utils.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
-
-    # Get the direction towards the person
-    person_direction = get_person_direction(results.pose_landmarks.landmark, frame.shape[1], frame.shape[0])
+        #cv2.putText(frame, "FALL DETECTED!", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        person_direction = get_person_direction(results.pose_landmarks.landmark, frame.shape[1], frame.shape[0])
+        text = f"FALL DETECTED -> Direction: {person_direction}"
 
     # Move the car based on the direction
-    move_car(person_direction)
+        move_car(person_direction)
+        color = (0, 0, 255)
+        #move_to_person(fall_detected, text, color)
+    else:
+        move_car("none")
+        text = "Inspecting"
+        color = (0, 255, 0)
 
-    # Display the direction on the screen
-    cv2.putText(frame, f"Direction: {person_direction}", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        #    Display the direction on the screen
+    cv2.putText(frame, text, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
 
     cv2.imshow("Car Camera Feed", frame)
 
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break
-"""
+
 cap.release()
 GPIO.cleanup()
 cv2.destroyAllWindows()
