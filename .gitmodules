@@ -3,4 +3,7 @@
 	url = https://github.com/recastnavigation/recastnavigation
 [submodule "VideoPipe"]
 	path = VideoPipe
-	url = https://github.com/sherlockchou86/VideoPipe
+  url = https://github.com/sherlockchou86/VideoPipe
+[submodule "Camera-1"]
+  path = Camera-1
+  url = https://github.com/tnguyen145/Camera-1
