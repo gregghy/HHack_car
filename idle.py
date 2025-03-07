@@ -9,6 +9,7 @@ import RPi.GPIO as GPIO
 import time
 import cv2
 import mediapipe as mp
+import pyttsx3
 
 # Set up GPIO
 GPIO.setmode(GPIO.BCM)
@@ -32,12 +33,16 @@ motor_pins = [front_left_motor_forward, front_left_motor_backward, front_right_m
 for pin in motor_pins:
     GPIO.setup(pin, GPIO.OUT)
 
-# HC-SR04 Ultrasonic Sensor Pins
-TRIG = 5
-ECHO = 6
+# Set up GPIO
+GPIO.setmode(GPIO.BCM)
+
+# Define GPIO pins for TRIG and ECHO
+TRIG = 6  # GPIO pin 6 for TRIG
+ECHO = 5  # GPIO pin 5 for ECHO
+
+# Set up the trigger and echo pins
 GPIO.setup(TRIG, GPIO.OUT)
 GPIO.setup(ECHO, GPIO.IN)
-
 # Initialize MediaPipe Pose model
 mp_pose = mp.solutions.pose
 pose = mp_pose.Pose()
@@ -68,7 +73,7 @@ model = vosk.Model(MODEL_PATH)
 recognizer = vosk.KaldiRecognizer(model, SAMPLE_RATE)
 
 # Flag to control the loop
-running = True
+speech_running = True
 
 # Ultra-fast callback function
 def callback(indata, frames, time, status):
@@ -89,24 +94,27 @@ def callback(indata, frames, time, status):
 
 # Command processing for instant response
 def process_command(text):
-    global running
+    global speech_running
     if "stop" in text.lower():
         print("\n🛑 Stopping...")
-        running = False
-        sys.exit(0)
+        speech_running = False
     elif "hello" in text.lower():
         print("\n👋 Hello! How can I help?")
-
+    elif "Yes" in text.lower():
+        text = "I will call nine one one"
+        talk(text)
+        
 # Threaded function to run speech recognition
 def start_recognition():
-    global running
+    global speech_running
     print("\n🎤 Listening... (Say 'stop' to exit)")
     
     with sd.InputStream(samplerate=SAMPLE_RATE, channels=CHANNELS, dtype="int16",
                         callback=callback, blocksize=BUFFER_SIZE):
-        while running:
-            pass  # Keep alive without blocking
+        while speech_running:
+            sd.sleep(100)
 
+"""
 def get_distance():
     GPIO.output(TRIG, True)
     time.sleep(0.00001)
@@ -114,7 +122,7 @@ def get_distance():
 
     start_time = time.time()
     stop_time = time.time()
-
+    
     while GPIO.input(ECHO) == 0:
         start_time = time.time()
 
@@ -122,9 +130,44 @@ def get_distance():
         stop_time = time.time()
 
     elapsed_time = stop_time - start_time
-    distance = (elapsed_time * 34300) / 2  # Speed of sound is 343 m/s
+    distance = round(elapsed_time * 17150, 2)  # Speed of sound is 343 m/s
 
     return distance
+"""
+def get_distance():
+    # Ensure the trigger is low to start
+    GPIO.output(TRIG, GPIO.LOW)
+    time.sleep(0.1)
+
+    # Send a pulse to the TRIG pin
+    GPIO.output(TRIG, GPIO.HIGH)
+    time.sleep(0.00001)
+    GPIO.output(TRIG, GPIO.LOW)
+
+    # Wait for the ECHO pin to go HIGH (signal sent)
+    pulse_start = time.time()
+    while GPIO.input(ECHO) == GPIO.LOW:
+        pulse_start = time.time()
+        if pulse_start - time.time() > 0.1:  # Timeout after 100ms
+            print("Error: Timeout waiting for echo start")
+            return -1  # Indicate error if timeout occurs
+
+    # Wait for the ECHO pin to go LOW (signal received)
+    pulse_end = time.time()
+    while GPIO.input(ECHO) == GPIO.HIGH:
+        pulse_end = time.time()
+        if pulse_end - pulse_start > 0.1:  # Timeout after 100ms
+            print("Error: Timeout waiting for echo end")
+            return -1  # Indicate error if timeout occurs
+
+    # Calculate the pulse duration
+    pulse_duration = pulse_end - pulse_start
+    print(f"Raw pulse duration: {pulse_duration} seconds")  # Debugging line
+
+    # Calculate distance in cm using the formula: distance = (pulse_duration * speed_of_sound) / 2
+    distance = pulse_duration * 17150  # Speed of sound = 34300 cm/s (divided by 2 to account for round-trip)
+    print(f"Raw distance calculation: {distance} cm")  # Debugging line
+    return round(distance, 2)
 
 # Function to control the car's movement
 def move_car(direction, distance):
@@ -137,22 +180,22 @@ def move_car(direction, distance):
     GPIO.output(ENA, GPIO.HIGH)
     GPIO.output(ENB, GPIO.HIGH)
     
-    if direction == "right":
+    if direction == "backward":
         GPIO.output(front_left_motor_forward, GPIO.LOW)
         GPIO.output(front_left_motor_backward, GPIO.HIGH)
         GPIO.output(front_right_motor_forward, GPIO.HIGH)
         GPIO.output(front_right_motor_backward, GPIO.LOW)
-    elif direction == "left":
+    elif direction == "foward":
         GPIO.output(front_left_motor_forward, GPIO.HIGH)
         GPIO.output(front_left_motor_backward, GPIO.LOW)
         GPIO.output(front_right_motor_forward, GPIO.LOW)
         GPIO.output(front_right_motor_backward, GPIO.HIGH)
-    elif direction == "forward":
+    elif direction == "left":
         GPIO.output(front_left_motor_forward, GPIO.HIGH)
         GPIO.output(front_left_motor_backward, GPIO.LOW)
         GPIO.output(front_right_motor_forward, GPIO.HIGH)
         GPIO.output(front_right_motor_backward, GPIO.LOW)
-    elif direction == "backward":
+    elif direction == "right":
         GPIO.output(front_left_motor_forward, GPIO.LOW)
         GPIO.output(front_left_motor_backward, GPIO.HIGH)
         GPIO.output(front_right_motor_forward, GPIO.LOW)
@@ -160,6 +203,11 @@ def move_car(direction, distance):
     else:
         for pin in motor_pins:
             GPIO.output(pin, GPIO.LOW)
+
+def stop_car():
+    for pin in motor_pins:
+            GPIO.output(pin, GPIO.LOW)
+
 
 
 # Function to detect the direction of the person
@@ -213,6 +261,7 @@ def detect_fall(landmarks, height):
 
     return False  # No fall detected
 
+
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret:
@@ -238,20 +287,24 @@ while cap.isOpened():
         person_direction = get_person_direction(results.pose_landmarks.landmark, frame.shape[1], frame.shape[0])
         text = f"FALL DETECTED -> Direction: {person_direction}"
 
-    # Move the car based on the direction
-        distance = get_distance()	
+    # Move the car based on the direction	
+        distance = get_distance()
+        print(distance)
         move_car(person_direction, distance)
         color = (0, 0, 255)
         #move_to_person(fall_detected, text, color)
+        
         if distance <= 80:
+            stop_car()
             # Run recognition in a high-priority thread
             recognition_thread = threading.Thread(target=start_recognition, daemon=True)
             recognition_thread.start()
 
             # Keep script running
-            while running:
+            while speech_running:
                 pass
     else:
+        stop_car()
         text = "Inspecting"
         color = (0, 255, 0)
 
