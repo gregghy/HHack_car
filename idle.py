@@ -117,7 +117,7 @@ def callback(indata, frames, time, status):
 def process_command(text):
     global speech_running
     if "stop" in text.lower():
-        text = "Stopping, I will not call nine one one"
+        text = "I will not call nine one one"
         print("\n🛑" + text)
         speak(text)
         speech_running = False
@@ -140,6 +140,10 @@ def start_recognition():
             sd.sleep(100)
 
 def speak(text):
+    engine = pyttsx3.init()
+    engine.setProperty('rate', 140)
+    voices = engine.getProperty('voices')
+    engine.setProperty('voice', voices[1].id)  # Adjust if needed
     engine.say(text)
     engine.runAndWait()
 

@@ -1,24 +1,22 @@
 import pyttsx3
-engine = pyttsx3.init()
+import time
 
 # For Mac, If you face error related to "pyobjc" when running the `init()` method :
 # Install 9.0.1 version of pyobjc : "pip install pyobjc>=9.0.1"
-text = "You are on the ground. Should I call nine one one?"
+#text = "You are on the ground."
+text2 = "Do I call nine one one?"
 
 # RATE
-rate = engine.getProperty('rate')   # getting details of current speaking rate
-engine.setProperty('rate', 140)
-
-
-# VOICE
-voices = engine.getProperty('voices')       # getting details of current voice
-#engine.setProperty('voice', voices[0].id)  # changing index, changes voices. o for male
-engine.setProperty('voice', voices[1].id)
-
 def speak(text):
+    engine = pyttsx3.init()
+    engine.setProperty('rate', 160)
+    voices = engine.getProperty('voices')
+    engine.setProperty('voice', voices[1].id)  # Adjust if needed
+    #engine.say(text)
+    #engine.runAndWait()
     engine.say(text)
     engine.runAndWait()
 
-speak(text)
+speak(text2)
 
 engine.stop()
