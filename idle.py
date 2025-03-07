@@ -82,7 +82,7 @@ recognizer = vosk.KaldiRecognizer(model, SAMPLE_RATE)
 # Flag to control the loop
 speech_running = True
 
-
+"""
 
 engine = pyttsx3.init()
 
@@ -95,7 +95,7 @@ voices = engine.getProperty('voices')       # getting details of current voice
 #engine.setProperty('voice', voices[0].id)  # changing index, changes voices. o for male
 engine.setProperty('voice', voices[1].id)
 
-
+"""
 # Ultra-fast callback function
 def callback(indata, frames, time, status):
     if status:
@@ -117,17 +117,17 @@ def callback(indata, frames, time, status):
 def process_command(text):
     global speech_running
     if "stop" in text.lower():
-        text = "I will not call nine one one"
+        text = "Stopping, I will not call nine one one"
         print("\n🛑" + text)
-        speak(text)
+        speak_thread = threading.Thread(target=speak(text), deamon = True)
         speech_running = False
     elif "hello" in text.lower():
         text = "Hello! How can I help?"
         print("\n👋 " + text)
-        speak(text)
+        speak_thread = threading.Thread(target=speak(text), deamon = True)
     elif "Yes" in text.lower():
         text = "I will call nine one one"
-        speak(text)
+        speak_thread = threading.Thread(target=speak(text), deamon = True)
         
 # Threaded function to run speech recognition
 def start_recognition():
