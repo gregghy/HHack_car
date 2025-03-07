@@ -43,10 +43,15 @@ ECHO = 5  # GPIO pin 5 for ECHO
 # Set up the trigger and echo pins
 GPIO.setup(TRIG, GPIO.OUT)
 GPIO.setup(ECHO, GPIO.IN)
+
+
+
 # Initialize MediaPipe Pose model
 mp_pose = mp.solutions.pose
 pose = mp_pose.Pose()
 mp_drawing = mp.solutions.drawing_utils  # For drawing landmarks
+
+
 
 # Open webcam
 cap = cv2.VideoCapture(0)
@@ -54,6 +59,8 @@ cap = cv2.VideoCapture(0)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 480)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
 frame_rate = 24
+
+
 
 # Set up microphone parameters
 SAMPLE_RATE = 16000  # Vosk requires 16 kHz
@@ -74,6 +81,20 @@ recognizer = vosk.KaldiRecognizer(model, SAMPLE_RATE)
 
 # Flag to control the loop
 speech_running = True
+
+
+
+engine = pyttsx3.init()
+
+# RATE
+rate = engine.getProperty('rate')   # getting details of current speaking rate
+engine.setProperty('rate', 140)
+
+# VOICE
+voices = engine.getProperty('voices')       # getting details of current voice
+#engine.setProperty('voice', voices[0].id)  # changing index, changes voices. o for male
+engine.setProperty('voice', voices[1].id)
+
 
 # Ultra-fast callback function
 def callback(indata, frames, time, status):
@@ -96,13 +117,17 @@ def callback(indata, frames, time, status):
 def process_command(text):
     global speech_running
     if "stop" in text.lower():
-        print("\n🛑 Stopping...")
+        text = "Stopping, I will not call nine one one"
+        print("\n🛑" + text)
+        speak(text)
         speech_running = False
     elif "hello" in text.lower():
-        print("\n👋 Hello! How can I help?")
+        text = "Hello! How can I help?"
+        print("\n👋 " + text)
+        speak(text)
     elif "Yes" in text.lower():
         text = "I will call nine one one"
-        talk(text)
+        speak(text)
         
 # Threaded function to run speech recognition
 def start_recognition():
@@ -113,6 +138,10 @@ def start_recognition():
                         callback=callback, blocksize=BUFFER_SIZE):
         while speech_running:
             sd.sleep(100)
+
+def speak(text):
+    engine.say(text)
+    engine.runAndWait()
 
 """
 def get_distance():
@@ -296,6 +325,8 @@ while cap.isOpened():
         
         if distance <= 80:
             stop_car()
+            text = "You are on the ground. Should I call nine one one?"
+            speak(text)
             # Run recognition in a high-priority thread
             recognition_thread = threading.Thread(target=start_recognition, daemon=True)
             recognition_thread.start()
@@ -318,5 +349,6 @@ while cap.isOpened():
 
 cap.release()
 GPIO.cleanup()
+engine.stop()
 cv2.destroyAllWindows()
 

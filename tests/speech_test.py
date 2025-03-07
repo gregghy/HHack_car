@@ -12,7 +12,7 @@ CHANNELS = 1         # Mono channel
 BUFFER_SIZE = 4000   # Small buffer for ultra-low latency
 
 # Path to the optimized Vosk model (use a faster one!)
-MODEL_PATH = "vosk-model-en-us-0.22-lgraph"  # Faster model with better accuracy
+MODEL_PATH = "../vosk-model-en-us-0.22-lgraph"  # Faster model with better accuracy
 #MODEL_PATH = "vosk-model-en-us-0.42-gigaspeech"
 # Check if model exists
 if not os.path.exists(MODEL_PATH):
@@ -49,7 +49,6 @@ def process_command(text):
     if "stop" in text.lower():
         print("\n🛑 Stopping...")
         running = False
-        sys.exit(0)
     elif "hello" in text.lower():
         print("\n👋 Hello! How can I help?")
 
@@ -61,7 +60,7 @@ def start_recognition():
     with sd.InputStream(samplerate=SAMPLE_RATE, channels=CHANNELS, dtype="int16",
                         callback=callback, blocksize=BUFFER_SIZE):
         while running:
-            pass  # Keep alive without blocking
+            sd.sleep(100)  # Keep alive without blocking
 
 # Run recognition in a high-priority thread
 recognition_thread = threading.Thread(target=start_recognition, daemon=True)
