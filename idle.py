@@ -15,26 +15,40 @@ import pyttsx3
 GPIO.setmode(GPIO.BCM)
 
 # Motor pins setup
-front_left_motor_forward = 17
-front_left_motor_backward = 18
-front_right_motor_forward = 27
-front_right_motor_backward = 22
-rear_left_motor_forward = 23
-rear_left_motor_backward = 24
-rear_right_motor_forward = 25
-rear_right_motor_backward = 8
-ENA = 12
-ENB = 13
+front_left_motor_in1 = 17
+front_left_motor_in2 = 18
+front_left_motor_ena = 12
 
-motor_pins = [front_left_motor_forward, front_left_motor_backward, front_right_motor_forward,
-              front_right_motor_backward, rear_left_motor_forward, rear_left_motor_backward,
-              rear_right_motor_forward, rear_right_motor_backward, ENA, ENB]
+front_right_motor_in3 = 22
+front_right_motor_in4 = 27
+front_right_motor_enb = 13
+
+rear_left_motor_in1 = 23
+rear_left_motor_in2 = 24
+rear_left_motor_ena = 16
+
+rear_right_motor_in3 = 25
+rear_right_motor_in4 = 8
+rear_right_motor_enb = 20
+
+motor_pins = [front_left_motor_in1, front_left_motor_in2, front_left_motor_ena,
+              front_right_motor_in3, front_right_motor_in4, front_right_motor_enb,
+              rear_left_motor_in1, rear_left_motor_in2, rear_left_motor_ena,
+              rear_right_motor_in3, rear_right_motor_in4, rear_right_motor_enb]
 
 for pin in motor_pins:
     GPIO.setup(pin, GPIO.OUT)
 
-# Set up GPIO
-GPIO.setmode(GPIO.BCM)
+# Set up PWM for motor speed control
+pwm_front_left = GPIO.PWM(front_left_motor_ena, 1000)
+pwm_front_right = GPIO.PWM(front_right_motor_enb, 1000)
+pwm_rear_left = GPIO.PWM(rear_left_motor_ena, 1000)
+pwm_rear_right = GPIO.PWM(rear_right_motor_enb, 1000)
+
+pwm_front_left.start(0)
+pwm_front_right.start(0)
+pwm_rear_left.start(0)
+pwm_rear_right.start(0)
 
 # Define GPIO pins for TRIG and ECHO
 TRIG = 6  # GPIO pin 6 for TRIG
@@ -82,8 +96,6 @@ recognizer = vosk.KaldiRecognizer(model, SAMPLE_RATE)
 # Flag to control the loop
 speech_running = True
 
-"""
-
 engine = pyttsx3.init()
 
 # RATE
@@ -95,7 +107,7 @@ voices = engine.getProperty('voices')       # getting details of current voice
 #engine.setProperty('voice', voices[0].id)  # changing index, changes voices. o for male
 engine.setProperty('voice', voices[1].id)
 
-"""
+
 # Ultra-fast callback function
 def callback(indata, frames, time, status):
     if status:
@@ -116,18 +128,25 @@ def callback(indata, frames, time, status):
 # Command processing for instant response
 def process_command(text):
     global speech_running
-    if "stop" in text.lower():
+    if "no" in text.lower():
         text = "Stopping, I will not call nine one one"
         print("\n🛑" + text)
-        speak_thread = threading.Thread(target=speak(text), deamon = True)
+        #speak_thread = threading.Thread(target=lambda: speak(text), daemon = True)
+        speak(text)
         speech_running = False
     elif "hello" in text.lower():
         text = "Hello! How can I help?"
         print("\n👋 " + text)
-        speak_thread = threading.Thread(target=speak(text), deamon = True)
+        #speak_thread = threading.Thread(target=lambda: speak(text), daemon = True)
+        speak(text)
     elif "Yes" in text.lower():
         text = "I will call nine one one"
-        speak_thread = threading.Thread(target=speak(text), deamon = True)
+        #speak_thread = threading.Thread(target=lambda: speak(text), daemon = True)
+        speak(text)
+    else:
+        text = "I will call nine one one"
+        #speak_thread = threading.Thread(target=lambda: speak(text), daemon = True)
+        speak(text)
         
 # Threaded function to run speech recognition
 def start_recognition():
@@ -140,10 +159,6 @@ def start_recognition():
             sd.sleep(100)
 
 def speak(text):
-    engine = pyttsx3.init()
-    engine.setProperty('rate', 140)
-    voices = engine.getProperty('voices')
-    engine.setProperty('voice', voices[1].id)  # Adjust if needed
     engine.say(text)
     engine.runAndWait()
 
@@ -204,42 +219,74 @@ def get_distance():
 
 # Function to control the car's movement
 def move_car(direction, distance):
-    if distance < 80:  # Stop if an obstacle is too close
-        print("Obstacle detected! Stopping car.")
-        for pin in motor_pins:
-            GPIO.output(pin, GPIO.LOW)
+    if distance <= 80:
         return
-
-    GPIO.output(ENA, GPIO.HIGH)
-    GPIO.output(ENB, GPIO.HIGH)
     
-    if direction == "backward":
-        GPIO.output(front_left_motor_forward, GPIO.LOW)
-        GPIO.output(front_left_motor_backward, GPIO.HIGH)
-        GPIO.output(front_right_motor_forward, GPIO.HIGH)
-        GPIO.output(front_right_motor_backward, GPIO.LOW)
-    elif direction == "foward":
-        GPIO.output(front_left_motor_forward, GPIO.HIGH)
-        GPIO.output(front_left_motor_backward, GPIO.LOW)
-        GPIO.output(front_right_motor_forward, GPIO.LOW)
-        GPIO.output(front_right_motor_backward, GPIO.HIGH)
-    elif direction == "left":
-        GPIO.output(front_left_motor_forward, GPIO.HIGH)
-        GPIO.output(front_left_motor_backward, GPIO.LOW)
-        GPIO.output(front_right_motor_forward, GPIO.HIGH)
-        GPIO.output(front_right_motor_backward, GPIO.LOW)
+    if direction == "left":
+        turn_left(75)
     elif direction == "right":
-        GPIO.output(front_left_motor_forward, GPIO.LOW)
-        GPIO.output(front_left_motor_backward, GPIO.HIGH)
-        GPIO.output(front_right_motor_forward, GPIO.LOW)
-        GPIO.output(front_right_motor_backward, GPIO.HIGH)
+        turn_right(75)
+    elif direction == "forward":
+        move_forward(75)
     else:
-        for pin in motor_pins:
-            GPIO.output(pin, GPIO.LOW)
+        stop_car()  # Stop the car if no person is detected
+    return
+
+# Motor control functions
+def move_forward(speed=100):
+    for pin in [(front_left_motor_in1, front_left_motor_in2), (front_right_motor_in3, front_right_motor_in4),
+                (rear_left_motor_in1, rear_left_motor_in2), (rear_right_motor_in3, rear_right_motor_in4)]:
+        GPIO.output(pin[0], GPIO.HIGH)
+        GPIO.output(pin[1], GPIO.LOW)
+    pwm_front_left.ChangeDutyCycle(speed)
+    pwm_front_right.ChangeDutyCycle(speed)
+    pwm_rear_left.ChangeDutyCycle(speed)
+    pwm_rear_right.ChangeDutyCycle(speed)
+
+
+def move_backward(speed=100):
+    for pin in [(front_left_motor_in1, front_left_motor_in2), (front_right_motor_in3, front_right_motor_in4),
+                (rear_left_motor_in1, rear_left_motor_in2), (rear_right_motor_in3, rear_right_motor_in4)]:
+        GPIO.output(pin[0], GPIO.LOW)
+        GPIO.output(pin[1], GPIO.HIGH)
+    pwm_front_left.ChangeDutyCycle(speed)
+    pwm_front_right.ChangeDutyCycle(speed)
+    pwm_rear_left.ChangeDutyCycle(speed)
+    pwm_rear_right.ChangeDutyCycle(speed)
+
+
+def turn_left(speed=100):
+    for pin in [(front_left_motor_in1, front_left_motor_in2), (rear_left_motor_in1, rear_left_motor_in2)]:
+        GPIO.output(pin[0], GPIO.LOW)
+        GPIO.output(pin[1], GPIO.HIGH)
+    for pin in [(front_right_motor_in3, front_right_motor_in4), (rear_right_motor_in3, rear_right_motor_in4)]:
+        GPIO.output(pin[0], GPIO.HIGH)
+        GPIO.output(pin[1], GPIO.LOW)
+    pwm_front_left.ChangeDutyCycle(speed)
+    pwm_front_right.ChangeDutyCycle(speed)
+    pwm_rear_left.ChangeDutyCycle(speed)
+    pwm_rear_right.ChangeDutyCycle(speed)
+
+
+def turn_right(speed=100):
+    for pin in [(front_left_motor_in1, front_left_motor_in2), (rear_left_motor_in1, rear_left_motor_in2)]:
+        GPIO.output(pin[0], GPIO.HIGH)
+        GPIO.output(pin[1], GPIO.LOW)
+    for pin in [(front_right_motor_in3, front_right_motor_in4), (rear_right_motor_in3, rear_right_motor_in4)]:
+        GPIO.output(pin[0], GPIO.LOW)
+        GPIO.output(pin[1], GPIO.HIGH)
+    pwm_front_left.ChangeDutyCycle(speed)
+    pwm_front_right.ChangeDutyCycle(speed)
+    pwm_rear_left.ChangeDutyCycle(speed)
+    pwm_rear_right.ChangeDutyCycle(speed)
+
 
 def stop_car():
-    for pin in motor_pins:
-            GPIO.output(pin, GPIO.LOW)
+    pwm_front_left.ChangeDutyCycle(0)
+    pwm_front_right.ChangeDutyCycle(0)
+    pwm_rear_left.ChangeDutyCycle(0)
+    pwm_rear_right.ChangeDutyCycle(0)
+
 
 
 
@@ -320,7 +367,7 @@ while cap.isOpened():
         person_direction = get_person_direction(results.pose_landmarks.landmark, frame.shape[1], frame.shape[0])
         text = f"FALL DETECTED -> Direction: {person_direction}"
 
-    # Move the car based on the direction	
+    # Move the car based on the direction
         distance = get_distance()
         print(distance)
         move_car(person_direction, distance)
@@ -337,7 +384,11 @@ while cap.isOpened():
 
             # Keep script running
             while speech_running:
-                pass
+                time.sleep(6000)
+                text = "I will call nine one one"
+                #speak_thread = threading.Thread(target=lambda: speak(text), daemon = True)
+                speak(text)
+                speech_running = False
     else:
         stop_car()
         text = "Inspecting"
