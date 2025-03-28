@@ -31,8 +31,8 @@ motor_pins = [front_left_motor_forward, front_left_motor_backward, front_right_m
               rear_right_motor_forward, rear_right_motor_backward, ENA, ENB]
 
 for pin in motor_pins:
-    GPIO.setup(pin, GPIO.OUT)
 
+    GPIO.setup(pin, GPIO.OUT)
 # Set up GPIO
 GPIO.setmode(GPIO.BCM)
 
@@ -82,7 +82,6 @@ recognizer = vosk.KaldiRecognizer(model, SAMPLE_RATE)
 # Flag to control the loop
 speech_running = True
 
-"""
 
 engine = pyttsx3.init()
 
@@ -95,7 +94,6 @@ voices = engine.getProperty('voices')       # getting details of current voice
 #engine.setProperty('voice', voices[0].id)  # changing index, changes voices. o for male
 engine.setProperty('voice', voices[1].id)
 
-"""
 # Ultra-fast callback function
 def callback(indata, frames, time, status):
     if status:
@@ -119,15 +117,18 @@ def process_command(text):
     if "stop" in text.lower():
         text = "Stopping, I will not call nine one one"
         print("\n🛑" + text)
-        speak_thread = threading.Thread(target=speak(text), deamon = True)
+        #speak_thread = threading.Thread(target=speak(text), deamon = True)
+        speak(text)
         speech_running = False
     elif "hello" in text.lower():
         text = "Hello! How can I help?"
         print("\n👋 " + text)
-        speak_thread = threading.Thread(target=speak(text), deamon = True)
+        #speak_thread = threading.Thread(target=speak(text), deamon = True)
+        speak(text)
     elif "Yes" in text.lower():
         text = "I will call nine one one"
-        speak_thread = threading.Thread(target=speak(text), deamon = True)
+        #speak_thread = threading.Thread(target=speak(text), deamon = True)
+        speak(text)
         
 # Threaded function to run speech recognition
 def start_recognition():
@@ -140,10 +141,6 @@ def start_recognition():
             sd.sleep(100)
 
 def speak(text):
-    engine = pyttsx3.init()
-    engine.setProperty('rate', 140)
-    voices = engine.getProperty('voices')
-    engine.setProperty('voice', voices[1].id)  # Adjust if needed
     engine.say(text)
     engine.runAndWait()
 
@@ -259,6 +256,8 @@ def get_person_direction(landmarks, frame_width, frame_height):
             return "forward"
     return "no_person"
 
+def 
+
 
 def detect_fall(landmarks, height):
     """
@@ -351,8 +350,38 @@ while cap.isOpened():
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break
 
-cap.release()
-GPIO.cleanup()
-engine.stop()
-cv2.destroyAllWindows()
-
+# Initialize MQTT client
+client = mqtt.Client()
+client.on_connect = on_connect
+client.on_message = on_message
+# Connect to MQTT broker
+try:
+    print(f"Connecting to MQTT broker at {BROKER_IP}:{BROKER_PORT}...")
+    client.connect(BROKER_IP, BROKER_PORT, 60)
+    client.loop_start()
+except Exception as e:
+    print(f"Failed to connect to MQTT broker: {e}")
+try:
+    print("Robot navigation system started")
+    print("Waiting for fall detection alerts...")
+    
+    # Main loop - keep program running and update map display
+    while True:
+        draw_map()
+        time.sleep(0.1)
+        
+        # Check for keyboard input to exit
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            break
+except KeyboardInterrupt:
+    print("Program interrupted by user")
+finally:
+    # Clean up
+    cap.release()
+    engine.stop()
+    client.loop_stop()
+    client.disconnect()
+    stop_robot()
+    GPIO.cleanup()
+    cv2.destroyAllWindows()
+    print("Resources released")
